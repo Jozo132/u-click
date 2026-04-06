@@ -1,0 +1,29 @@
+{
+  "name": "u-click",
+  "version": "1.0.0",
+  "description": "Portable universal web analytics service that tracks clicks, events and user interactions",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node test/server.test.js"
+  },
+  "keywords": [
+    "analytics",
+    "tracking",
+    "clicks",
+    "events",
+    "user-interaction",
+    "web-analytics"
+  ],
+  "author": "Jozo132",
+  "license": "MIT",
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "chart.js": "^4.5.1",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.3.2",
+    "ws": "^8.18.0"
+  }
+}
