@@ -616,7 +616,7 @@
   // Mock Analytics Engine — replaces the real backend for the demo
   // ═══════════════════════════════════════════════════════════════
 
-  var SESSION_ID = 'demo-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
+  var SESSION_ID = 'demo-' + Date.now().toString(36) + '-' + Array.from(crypto.getRandomValues(new Uint8Array(4))).map(function(b) { return b.toString(16).padStart(2, '0') }).join('')
   var SESSION_START = Date.now()
   var events = []
   var typeCounts = {}
@@ -628,7 +628,7 @@
   var RAGE_COUNT = 3
 
   // Escape HTML helper
-  function esc(s) { return s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
+  function esc(s) { return (s === null || s === undefined) ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
 
   function recordEvent(evt) {
     evt.session_id = SESSION_ID
