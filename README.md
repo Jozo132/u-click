@@ -6,6 +6,10 @@
 |---|---|
 | ![Admin Dashboard](https://github.com/user-attachments/assets/aa604fd0-7296-447e-8cc7-2555838a598f) | ![Demo Page](https://github.com/user-attachments/assets/ad5c8c00-9e79-4f7b-91b5-0272884e697f) |
 
+### 🎮 [Live Demo →](https://jozo132.github.io/u-click/)
+
+> Splitscreen demo — interact on the left, watch analytics update on the right in real time. No backend needed, runs entirely in the browser.
+
 ---
 
 ## Features
@@ -133,6 +137,8 @@ u-click/
 │   │   └── index.html   # Admin analytics dashboard SPA
 │   └── demo/
 │       └── index.html   # Interactive demo page
+├── docs/
+│   └── index.html       # GitHub Pages splitscreen demo (static, no backend)
 └── test/
     └── server.test.js   # Integration tests (node test/server.test.js)
 ```

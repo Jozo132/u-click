@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>u-click — Analytics Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
   <style>
     /* ── Reset / base ──────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -19,7 +20,7 @@
       --warn:    #f59e0b;
       --card-r:  12px;
     }
-    html, body { height: 100%; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+    html, body { height: 100%; font-family: 'Inter', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
 
     /* ── Layout ────────────────────────────────────────────────────── */
     .app { display: grid; grid-template-rows: 56px 1fr; height: 100vh; overflow: hidden; }
@@ -40,6 +41,8 @@
     .ws-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); transition: background .3s; }
     .ws-dot.connected { background: var(--accent2); }
     .range-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+    .header-link { color: var(--muted); text-decoration: none; font-size: 12px; transition: color .15s; display: flex; align-items: center; gap: 4px; }
+    .header-link:hover { color: var(--accent); }
 
     main { overflow-y: auto; padding: 24px; }
 
@@ -48,9 +51,10 @@
     .chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
     .chart-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
     .full-row { margin-bottom: 24px; }
+    .metrics-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
 
     @media (max-width: 900px) {
-      .chart-row, .chart-row-3 { grid-template-columns: 1fr; }
+      .chart-row, .chart-row-3, .metrics-row { grid-template-columns: 1fr; }
     }
 
     /* ── Card ──────────────────────────────────────────────────────── */
@@ -59,10 +63,20 @@
       border: 1px solid var(--border);
       border-radius: var(--card-r);
       padding: 20px;
+      position: relative;
+      overflow: hidden;
     }
-    .card-title { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 12px; }
+    .card-title { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
     .stat-value { font-size: 32px; font-weight: 700; line-height: 1; }
     .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .stat-icon { position: absolute; top: 16px; right: 18px; font-size: 22px; opacity: .2; }
+    .stat-trend { font-size: 11px; font-weight: 600; margin-top: 6px; }
+    .stat-trend.up { color: var(--accent2); }
+    .stat-trend.down { color: var(--danger); }
+
+    /* ── Metric bar ────────────────────────────────────────────────── */
+    .metric-bar { height: 6px; border-radius: 3px; background: var(--border); margin-top: 8px; overflow: hidden; }
+    .metric-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
 
     /* ── Canvas ────────────────────────────────────────────────────── */
     .chart-wrap { position: relative; height: 240px; }
@@ -81,6 +95,9 @@
     .badge-scroll { background: rgba(245,158,11,.15); color: #f59e0b; }
     .badge-form   { background: rgba(255,79,79,.15); color: #ff4f4f; }
     .badge-other  { background: rgba(255,255,255,.08); color: var(--muted); }
+    .pct-bar { display: inline-flex; align-items: center; gap: 6px; }
+    .pct-bar-track { width: 50px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .pct-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); }
 
     /* ── Feed ──────────────────────────────────────────────────────── */
     #feed { max-height: 400px; overflow-y: auto; }
@@ -108,6 +125,8 @@
     .loader { text-align: center; color: var(--muted); padding: 40px; }
     .pulse { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: pulse 1s ease-in-out infinite; }
     @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:.5} }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); animation: livePulse 2s ease-in-out infinite; display: inline-block; }
+    @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
     /* scrollbar */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -119,8 +138,11 @@
 <div class="app">
   <header>
     <div class="logo">u<span>-</span>click</div>
-    <span style="color:var(--muted);font-size:12px;">Analytics Dashboard</span>
+    <span style="color:var(--muted);font-size:12px;font-weight:600;">Analytics Dashboard</span>
     <div class="spacer"></div>
+    <a class="header-link" href="/demo/">
+      <span>🖥️</span> Demo
+    </a>
     <select class="range-select" id="range-select">
       <option value="3600000">Last hour</option>
       <option value="86400000" selected>Last 24 h</option>
@@ -135,23 +157,70 @@
   </header>
 
   <main>
-    <!-- Summary cards -->
+    <!-- Summary KPI cards -->
     <div class="summary-row" id="summary-row">
-      <div class="card"><div class="card-title">Sessions</div><div class="stat-value" id="s-sessions">—</div></div>
-      <div class="card"><div class="card-title">Page Views</div><div class="stat-value" id="s-pageviews">—</div></div>
-      <div class="card"><div class="card-title">Total Events</div><div class="stat-value" id="s-events">—</div></div>
-      <div class="card"><div class="card-title">Total Clicks</div><div class="stat-value" id="s-clicks">—</div></div>
-      <div class="card"><div class="card-title">Unique Pages</div><div class="stat-value" id="s-pages">—</div></div>
+      <div class="card">
+        <div class="stat-icon">👥</div>
+        <div class="card-title">Sessions</div>
+        <div class="stat-value" id="s-sessions">—</div>
+        <div class="stat-trend up" id="s-sessions-trend"></div>
+      </div>
+      <div class="card">
+        <div class="stat-icon">📄</div>
+        <div class="card-title">Page Views</div>
+        <div class="stat-value" id="s-pageviews">—</div>
+        <div class="stat-label" id="s-pv-rate"></div>
+      </div>
+      <div class="card">
+        <div class="stat-icon">📊</div>
+        <div class="card-title">Total Events</div>
+        <div class="stat-value" id="s-events">—</div>
+        <div class="stat-label" id="s-events-sub"></div>
+      </div>
+      <div class="card">
+        <div class="stat-icon">🖱️</div>
+        <div class="card-title">Total Clicks</div>
+        <div class="stat-value" id="s-clicks">—</div>
+        <div class="stat-label" id="s-ctr"></div>
+      </div>
+      <div class="card">
+        <div class="stat-icon">🌐</div>
+        <div class="card-title">Unique Pages</div>
+        <div class="stat-value" id="s-pages">—</div>
+        <div class="stat-label" id="s-pages-sub"></div>
+      </div>
+    </div>
+
+    <!-- Engagement metrics row -->
+    <div class="metrics-row">
+      <div class="card">
+        <div class="card-title">📈 Click-Through Rate</div>
+        <div class="stat-value" style="font-size:24px;" id="m-ctr">—</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="m-ctr-bar" style="width:0%;background:var(--accent);"></div></div>
+        <div class="stat-label" style="margin-top:6px;">Clicks / Page Views</div>
+      </div>
+      <div class="card">
+        <div class="card-title">📊 Events per Session</div>
+        <div class="stat-value" style="font-size:24px;" id="m-eps">—</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="m-eps-bar" style="width:0%;background:var(--accent2);"></div></div>
+        <div class="stat-label" style="margin-top:6px;">Engagement depth</div>
+      </div>
+      <div class="card">
+        <div class="card-title">🔥 Form Conversion</div>
+        <div class="stat-value" style="font-size:24px;" id="m-conv">—</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="m-conv-bar" style="width:0%;background:var(--warn);"></div></div>
+        <div class="stat-label" style="margin-top:6px;">Form submits / Sessions</div>
+      </div>
     </div>
 
     <!-- Timeline + event types -->
     <div class="chart-row">
       <div class="card">
-        <div class="card-title">Events over time</div>
+        <div class="card-title">📈 Events over time</div>
         <div class="chart-wrap"><canvas id="timeline-chart"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-title">Event types</div>
+        <div class="card-title">🍩 Event types</div>
         <div class="chart-wrap"><canvas id="type-chart"></canvas></div>
       </div>
     </div>
@@ -159,7 +228,7 @@
     <!-- Top pages + Top elements -->
     <div class="chart-row">
       <div class="card">
-        <div class="card-title">Top pages</div>
+        <div class="card-title">📄 Top pages</div>
         <div style="overflow-x:auto;">
           <table class="tbl" id="pages-table">
             <thead><tr><th>URL</th><th>Sessions</th><th>Events</th><th>Clicks</th></tr></thead>
@@ -168,11 +237,11 @@
         </div>
       </div>
       <div class="card">
-        <div class="card-title">Top clicked elements</div>
+        <div class="card-title">🖱️ Top clicked elements</div>
         <div style="overflow-x:auto;">
           <table class="tbl" id="elements-table">
-            <thead><tr><th>Element</th><th>Text</th><th>Clicks</th></tr></thead>
-            <tbody><tr><td colspan="3" class="loader"><span class="pulse"></span></td></tr></tbody>
+            <thead><tr><th>Element</th><th>Text</th><th>Clicks</th><th>% of Total</th></tr></thead>
+            <tbody><tr><td colspan="4" class="loader"><span class="pulse"></span></td></tr></tbody>
           </table>
         </div>
       </div>
@@ -180,7 +249,7 @@
 
     <!-- Click heatmap -->
     <div class="full-row card">
-      <div class="card-title">Click positions (relative to viewport)</div>
+      <div class="card-title">🔥 Click positions (relative to viewport)</div>
       <div class="heatmap-ctrl">
         <input type="text" id="heatmap-url" placeholder="Filter by page URL (leave blank for all pages)" />
         <button class="btn" onclick="loadHeatmap()">Apply</button>
@@ -190,13 +259,13 @@
 
     <!-- Recent events feed -->
     <div class="full-row card">
-      <div class="card-title">Live event feed</div>
+      <div class="card-title">⚡ Live event feed <span class="live-dot" style="margin-left:6px;"></span></div>
       <div id="feed"><div class="loader"><span class="pulse"></span></div></div>
     </div>
 
     <!-- Sessions table -->
     <div class="full-row card">
-      <div class="card-title">Recent sessions</div>
+      <div class="card-title">👤 Recent sessions</div>
       <div style="overflow-x:auto;">
         <table class="tbl" id="sessions-table">
           <thead><tr><th>Session</th><th>Page</th><th>Events</th><th>Clicks</th><th>Started</th></tr></thead>
@@ -298,6 +367,48 @@
     document.getElementById('s-events').textContent    = fmtN(data.total_events)
     document.getElementById('s-clicks').textContent    = fmtN(data.total_clicks)
     document.getElementById('s-pages').textContent     = fmtN(data.total_pages)
+
+    // Compute business metrics
+    var sessions = data.total_sessions || 1
+    var pageviews = data.total_pageviews || 0
+    var clicks = data.total_clicks || 0
+    var events = data.total_events || 0
+
+    // Pages/session
+    var pvRate = (pageviews / sessions).toFixed(1)
+    document.getElementById('s-pv-rate').textContent = pvRate + ' views/session'
+
+    // Events per session
+    var eps = (events / sessions).toFixed(1)
+    document.getElementById('s-events-sub').textContent = eps + ' events/session'
+
+    // Click-through rate
+    var ctr = pageviews > 0 ? ((clicks / pageviews) * 100).toFixed(1) : '0.0'
+    document.getElementById('s-ctr').textContent = ctr + '% CTR'
+
+    // Pages sub
+    document.getElementById('s-pages-sub').textContent = pageviews > 0 ? (pageviews / (data.total_pages || 1)).toFixed(1) + ' views/page' : ''
+
+    // Engagement metrics
+    document.getElementById('m-ctr').textContent = ctr + '%'
+    document.getElementById('m-ctr-bar').style.width = Math.min(100, parseFloat(ctr)) + '%'
+
+    document.getElementById('m-eps').textContent = eps
+    document.getElementById('m-eps-bar').style.width = Math.min(100, (parseFloat(eps) / 20) * 100) + '%'
+
+    // Form conversion (use event types for form_submit count)
+    loadFormConversion(sessions)
+  }
+
+  async function loadFormConversion(sessions) {
+    try {
+      var data = await fetchJson(apiUrl('/api/stats/event-types'))
+      var formSubmits = 0
+      data.forEach(function (r) { if (r.type === 'form_submit') formSubmits = r.count })
+      var convRate = sessions > 0 ? ((formSubmits / sessions) * 100).toFixed(1) : '0.0'
+      document.getElementById('m-conv').textContent = convRate + '%'
+      document.getElementById('m-conv-bar').style.width = Math.min(100, parseFloat(convRate)) + '%'
+    } catch (_) {}
   }
 
   /* ── Timeline chart ────────────────────────────────────────────── */
@@ -395,15 +506,18 @@
   async function loadElements() {
     var data = await fetchJson(apiUrl('/api/stats/elements'))
     var tbody = document.querySelector('#elements-table tbody')
-    if (!data.length) { tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:16px;">No data</td></tr>'; return }
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:16px;">No data</td></tr>'; return }
+    var totalClicks = data.reduce(function (s, r) { return s + r.clicks }, 0) || 1
     tbody.innerHTML = data.map(r => {
       var tag = esc(r.target_tag || '?')
       var id = r.target_id ? '#' + esc(r.target_id) : ''
       var cls = r.target_cls ? '.' + esc(r.target_cls.split(' ')[0]) : ''
+      var pct = Math.round((r.clicks / totalClicks) * 100)
       return `<tr>
         <td><code>${tag}${id}${cls}</code></td>
         <td class="truncate" title="${esc(r.target_text)}">${esc(r.target_text) || '<em style="color:var(--muted)">—</em>'}</td>
         <td>${fmtN(r.clicks)}</td>
+        <td><div class="pct-bar"><div class="pct-bar-track"><div class="pct-bar-fill" style="width:${pct}%"></div></div><span style="font-size:11px;">${pct}%</span></div></td>
       </tr>`
     }).join('')
   }

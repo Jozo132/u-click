@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>u-click — Live Analytics Demo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent: #6c63ff;
+      --accent2: #00d4aa;
+      --bg-dark: #0f1117;
+      --surface-dark: #1a1d27;
+      --border-dark: #2a2d3a;
+      --text-dark: #e2e8f0;
+      --muted-dark: #8892a4;
+      --bg-light: #f5f7fa;
+      --surface-light: #fff;
+      --border-light: #e2e8f0;
+      --text-light: #1a202c;
+      --muted-light: #718096;
+      --danger: #ff4f4f;
+      --warn: #f59e0b;
+      --success: #38a169;
+    }
+    html, body { height: 100%; overflow: hidden; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+    /* ── Top bar ───────────────────────────────────────────────── */
+    .topbar {
+      height: 48px;
+      background: linear-gradient(135deg, #6c63ff 0%, #4a42c8 100%);
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      color: #fff; font-size: 14px; font-weight: 600;
+      padding: 0 20px;
+      z-index: 100;
+      position: relative;
+    }
+    .topbar a { color: rgba(255,255,255,.85); text-decoration: none; font-weight: 400; font-size: 13px; }
+    .topbar a:hover { color: #fff; }
+    .topbar .logo { font-size: 16px; font-weight: 800; letter-spacing: -.5px; }
+    .topbar .sep { opacity: .3; }
+    .topbar .spacer { flex: 1; }
+    .topbar .gh-link { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,.15); padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; transition: background .15s; }
+    .topbar .gh-link:hover { background: rgba(255,255,255,.25); }
+
+    /* ── Splitscreen ───────────────────────────────────────────── */
+    .splitscreen {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: calc(100vh - 48px);
+      overflow: hidden;
+    }
+    @media (max-width: 960px) {
+      .splitscreen { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+    }
+
+    /* ── Pane labels ───────────────────────────────────────────── */
+    .pane-label {
+      position: absolute; top: 12px; z-index: 10;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    }
+    .left-pane { position: relative; overflow-y: auto; background: var(--bg-light); color: var(--text-light); }
+    .left-pane .pane-label { left: 16px; background: rgba(108,99,255,.12); color: var(--accent); }
+    .right-pane { position: relative; overflow-y: auto; background: var(--bg-dark); color: var(--text-dark); border-left: 2px solid var(--accent); }
+    .right-pane .pane-label { right: 16px; background: rgba(0,212,170,.15); color: var(--accent2); }
+
+    /* ── Divider ────────────────────────────────────────────────── */
+    .divider-line {
+      position: absolute; top: 0; left: 50%; width: 2px; height: 100%;
+      background: var(--accent); z-index: 5; pointer-events: none;
+    }
+    @media (max-width: 960px) { .divider-line { display: none; } }
+
+    /* ══════════════════════════════════════════════════════════════
+       LEFT PANE — User Interaction Demo
+       ══════════════════════════════════════════════════════════════ */
+    .demo-nav {
+      background: var(--surface-light);
+      border-bottom: 1px solid var(--border-light);
+      padding: 0 24px; height: 48px;
+      display: flex; align-items: center; gap: 16px;
+    }
+    .demo-nav .brand { font-weight: 700; font-size: 15px; color: var(--accent); }
+    .demo-nav a { color: var(--muted-light); text-decoration: none; font-size: 13px; }
+    .demo-nav a:hover { color: var(--text-light); }
+
+    .demo-hero {
+      background: linear-gradient(135deg, #6c63ff 0%, #4a42c8 100%);
+      color: #fff; padding: 48px 24px; text-align: center;
+    }
+    .demo-hero h1 { font-size: 32px; font-weight: 800; margin-bottom: 10px; }
+    .demo-hero p { font-size: 14px; opacity: .85; max-width: 440px; margin: 0 auto 20px; line-height: 1.6; }
+    .demo-hero .cta { display: inline-flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+
+    .btn-w { background: #fff; color: var(--accent); font-weight: 700; padding: 10px 22px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; transition: transform .15s; text-decoration: none; display: inline-block; }
+    .btn-w:hover { transform: translateY(-1px); }
+    .btn-ol { background: transparent; color: #fff; font-weight: 600; padding: 10px 22px; border-radius: 8px; border: 2px solid rgba(255,255,255,.4); cursor: pointer; font-size: 13px; transition: border-color .15s; text-decoration: none; display: inline-block; }
+    .btn-ol:hover { border-color: #fff; }
+
+    .demo-content { padding: 32px 24px; max-width: 640px; margin: 0 auto; }
+    .demo-content h2 { font-size: 20px; font-weight: 700; margin-bottom: 16px; color: var(--text-light); }
+    .demo-section {
+      background: var(--surface-light);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .demo-section h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+    .demo-section p { font-size: 12px; color: var(--muted-light); margin-bottom: 12px; line-height: 1.5; }
+
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .demo-btn {
+      padding: 8px 16px; border-radius: 6px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: opacity .15s, transform .1s;
+    }
+    .demo-btn:hover { opacity: .85; }
+    .demo-btn:active { transform: scale(.96); }
+    .demo-btn.purple { background: var(--accent); color: #fff; }
+    .demo-btn.green  { background: var(--success); color: #fff; }
+    .demo-btn.red    { background: var(--danger); color: #fff; }
+    .demo-btn.amber  { background: var(--warn); color: #fff; }
+    .demo-btn.gray   { background: #e2e8f0; color: #2d3748; }
+
+    .counter-display { font-size: 40px; font-weight: 800; color: var(--accent); text-align: center; padding: 16px; }
+    .counter-btns { display: flex; justify-content: center; gap: 12px; }
+
+    .demo-form { display: grid; gap: 12px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--muted-light); }
+    .form-group input, .form-group select, .form-group textarea {
+      padding: 8px 12px; border: 1px solid var(--border-light); border-radius: 6px;
+      font-size: 13px; font-family: inherit; background: var(--bg-light);
+      transition: border-color .15s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+
+    .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border-light); margin-bottom: 16px; }
+    .tab {
+      padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+      color: var(--muted-light); border-bottom: 2px solid transparent;
+      margin-bottom: -2px; transition: color .15s, border-color .15s;
+      background: none; border-top: none; border-left: none; border-right: none;
+    }
+    .tab:hover { color: var(--text-light); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .product-card {
+      background: var(--bg-light); border: 1px solid var(--border-light);
+      border-radius: 10px; padding: 16px; text-align: center; cursor: pointer;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .product-card:hover { border-color: var(--accent); box-shadow: 0 2px 12px rgba(108,99,255,.1); }
+    .product-emoji { font-size: 32px; margin-bottom: 8px; }
+    .product-name { font-size: 13px; font-weight: 600; }
+    .product-price { font-size: 12px; color: var(--muted-light); margin-top: 4px; }
+    .product-cta { margin-top: 8px; }
+
+    .demo-footer {
+      background: var(--surface-light); border-top: 1px solid var(--border-light);
+      padding: 16px 24px; text-align: center; color: var(--muted-light); font-size: 12px;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       RIGHT PANE — Admin Dashboard
+       ══════════════════════════════════════════════════════════════ */
+    .admin-header {
+      background: var(--surface-dark);
+      border-bottom: 1px solid var(--border-dark);
+      padding: 0 20px; height: 48px;
+      display: flex; align-items: center; gap: 12px;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .admin-logo { font-weight: 700; font-size: 15px; }
+    .admin-logo span { color: var(--accent); }
+    .admin-badge { font-size: 11px; color: var(--muted-dark); padding: 2px 8px; background: rgba(108,99,255,.12); border-radius: 4px; }
+    .admin-spacer { flex: 1; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); animation: livePulse 2s ease-in-out infinite; display: inline-block; }
+    @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .live-label { font-size: 11px; color: var(--accent2); font-weight: 600; display: flex; align-items: center; gap: 5px; }
+    .time-range-sel {
+      background: var(--bg-dark); color: var(--text-dark);
+      border: 1px solid var(--border-dark); border-radius: 5px;
+      padding: 3px 8px; font-size: 11px; cursor: pointer;
+    }
+
+    .admin-body { padding: 20px; }
+
+    /* KPI Cards */
+    .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 1200px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+    .kpi-card {
+      background: var(--surface-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 10px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card .kpi-icon { position: absolute; top: 12px; right: 14px; font-size: 20px; opacity: .3; }
+    .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted-dark); margin-bottom: 6px; font-weight: 600; }
+    .kpi-value { font-size: 28px; font-weight: 800; line-height: 1; }
+    .kpi-sub { font-size: 11px; color: var(--muted-dark); margin-top: 4px; }
+    .kpi-trend { font-size: 11px; font-weight: 700; margin-top: 6px; }
+    .kpi-trend.up { color: var(--accent2); }
+    .kpi-trend.down { color: var(--danger); }
+
+    /* Charts row */
+    .charts-row { display: grid; grid-template-columns: 5fr 3fr; gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 1200px) { .charts-row { grid-template-columns: 1fr; } }
+
+    .admin-card {
+      background: var(--surface-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .admin-card-title {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted-dark); margin-bottom: 12px; font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .chart-container { position: relative; height: 200px; }
+
+    /* Tables */
+    .admin-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 1200px) { .admin-tables { grid-template-columns: 1fr; } }
+
+    .admin-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .admin-tbl th {
+      text-align: left; font-weight: 600; color: var(--muted-dark);
+      font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+      padding: 6px 10px; border-bottom: 1px solid var(--border-dark);
+    }
+    .admin-tbl td {
+      padding: 7px 10px; border-bottom: 1px solid var(--border-dark);
+      color: var(--text-dark); vertical-align: middle;
+    }
+    .admin-tbl tr:last-child td { border-bottom: none; }
+    .admin-tbl tr:hover td { background: rgba(255,255,255,.02); }
+    .truncate { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+    .badge-click     { background: rgba(108,99,255,.2); color: #a89fff; }
+    .badge-pageview  { background: rgba(0,212,170,.15); color: #00d4aa; }
+    .badge-scroll    { background: rgba(245,158,11,.15); color: #f59e0b; }
+    .badge-form      { background: rgba(255,79,79,.15); color: #ff4f4f; }
+    .badge-idle      { background: rgba(100,100,120,.2); color: #8892a4; }
+    .badge-active    { background: rgba(80,200,120,.15); color: #50c878; }
+    .badge-rage      { background: rgba(255,79,79,.3); color: #ff4f4f; }
+    .badge-other     { background: rgba(255,255,255,.08); color: var(--muted-dark); }
+
+    /* Live Feed */
+    .feed-list { max-height: 300px; overflow-y: auto; }
+    .feed-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border-dark);
+      font-size: 11px;
+      animation: feedIn .3s ease;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    @keyframes feedIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+    .feed-ts { color: var(--muted-dark); min-width: 55px; font-family: monospace; font-size: 10px; }
+    .feed-type { min-width: 68px; }
+    .feed-detail { color: var(--muted-dark); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .feed-session { color: var(--accent); font-family: monospace; font-size: 10px; min-width: 50px; }
+
+    /* Engagement metrics */
+    .engagement-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+    @media (max-width: 1200px) { .engagement-row { grid-template-columns: 1fr; } }
+
+    .metric-bar { height: 6px; border-radius: 3px; background: var(--border-dark); margin-top: 8px; overflow: hidden; }
+    .metric-bar-fill { height: 100%; border-radius: 3px; transition: width .5s ease; }
+
+    /* Session list */
+    .session-row { margin-bottom: 20px; }
+
+    /* Scrollbar */
+    .right-pane ::-webkit-scrollbar { width: 5px; height: 5px; }
+    .right-pane ::-webkit-scrollbar-track { background: transparent; }
+    .right-pane ::-webkit-scrollbar-thumb { background: var(--border-dark); border-radius: 3px; }
+
+    /* Responsive: stack on mobile */
+    @media (max-width: 960px) {
+      .splitscreen { grid-template-columns: 1fr; grid-template-rows: auto auto; height: auto; overflow: auto; }
+      .left-pane, .right-pane { height: auto; min-height: 100vh; overflow: visible; }
+      html, body { overflow: auto; }
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Top Bar ───────────────────────────────────────────────── -->
+<div class="topbar">
+  <span class="logo">u-click</span>
+  <span class="sep">|</span>
+  <span style="font-weight:400;font-size:13px;">Live Analytics Demo</span>
+  <span class="spacer"></span>
+  <span style="font-size:12px;opacity:.7;">Interact on the left → Watch analytics update on the right</span>
+  <span class="spacer"></span>
+  <a class="gh-link" href="https://github.com/Jozo132/u-click" target="_blank" rel="noopener">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    View on GitHub
+  </a>
+</div>
+
+<!-- ── Splitscreen ─────────────────────────────────────────── -->
+<div class="splitscreen">
+
+<!-- ═══════════════════════════════════════════════════════════
+     LEFT PANE — Interactive User Demo Site
+     ═══════════════════════════════════════════════════════════ -->
+<div class="left-pane" id="left-pane">
+  <div class="pane-label">👤 User Interaction</div>
+
+  <div class="demo-nav">
+    <span class="brand">Acme SaaS</span>
+    <a href="#" data-nav="home">Home</a>
+    <a href="#" data-nav="features">Features</a>
+    <a href="#" data-nav="pricing">Pricing</a>
+    <a href="#" data-nav="contact">Contact</a>
+  </div>
+
+  <div class="demo-hero">
+    <h1>Build Better Products</h1>
+    <p>The all-in-one platform for teams who ship fast. Try clicking around — every interaction is tracked live.</p>
+    <div class="cta">
+      <button class="btn-w" id="btn-start-trial">Start Free Trial</button>
+      <button class="btn-ol" id="btn-watch-demo">Watch Demo</button>
+    </div>
+  </div>
+
+  <div class="demo-content">
+    <h2>Try it — every interaction is tracked!</h2>
+
+    <!-- Tabs -->
+    <div class="demo-section">
+      <h3>📑 Navigation Tabs</h3>
+      <p>Switch tabs to see tab-click events appear in the admin panel.</p>
+      <div class="tabs" id="demo-tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="products">Products</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+      <div class="tab-content active" data-tab-content="overview">
+        <p style="font-size:13px;color:var(--muted-light);line-height:1.6;">Welcome to the overview. This demo simulates a real SaaS application. Every click, scroll, and form interaction you make is captured and displayed in real-time on the admin dashboard to the right.</p>
+      </div>
+      <div class="tab-content" data-tab-content="products">
+        <div class="product-grid">
+          <div class="product-card" data-product="starter">
+            <div class="product-emoji">🚀</div>
+            <div class="product-name">Starter</div>
+            <div class="product-price">$9/mo</div>
+            <div class="product-cta"><button class="demo-btn purple" data-action="add-to-cart" data-product="starter">Add to Cart</button></div>
+          </div>
+          <div class="product-card" data-product="pro">
+            <div class="product-emoji">⚡</div>
+            <div class="product-name">Pro</div>
+            <div class="product-price">$29/mo</div>
+            <div class="product-cta"><button class="demo-btn green" data-action="add-to-cart" data-product="pro">Add to Cart</button></div>
+          </div>
+          <div class="product-card" data-product="team">
+            <div class="product-emoji">👥</div>
+            <div class="product-name">Team</div>
+            <div class="product-price">$79/mo</div>
+            <div class="product-cta"><button class="demo-btn amber" data-action="add-to-cart" data-product="team">Add to Cart</button></div>
+          </div>
+          <div class="product-card" data-product="enterprise">
+            <div class="product-emoji">🏢</div>
+            <div class="product-name">Enterprise</div>
+            <div class="product-price">Custom</div>
+            <div class="product-cta"><button class="demo-btn gray" data-action="contact-sales" data-product="enterprise">Contact Sales</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-content" data-tab-content="settings">
+        <p style="font-size:13px;color:var(--muted-light);line-height:1.6;">⚙️ Settings panel. Toggle options below to generate field_change events.</p>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="opt-notifications" name="notifications" checked /> Email Notifications
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="opt-darkmode" name="dark_mode" /> Dark Mode
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+            <input type="checkbox" id="opt-2fa" name="two_factor" /> Two-Factor Auth
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Button Clicks -->
+    <div class="demo-section">
+      <h3>🖱️ Action Buttons</h3>
+      <p>Click these buttons to generate click events with different element metadata.</p>
+      <div class="btn-group">
+        <button class="demo-btn purple" id="btn-save" data-action="save">💾 Save</button>
+        <button class="demo-btn green" id="btn-publish" data-action="publish">🚀 Publish</button>
+        <button class="demo-btn red" id="btn-delete" data-action="delete">🗑️ Delete</button>
+        <button class="demo-btn amber" id="btn-export" data-action="export">📤 Export</button>
+        <button class="demo-btn gray" id="btn-cancel" data-action="cancel">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Counter / Rage Click -->
+    <div class="demo-section">
+      <h3>🔢 Counter (Rage-Click Detector)</h3>
+      <p>Click ± rapidly (3 clicks in 500ms) to trigger rage-click detection.</p>
+      <div class="counter-display" id="counter">0</div>
+      <div class="counter-btns">
+        <button class="demo-btn red" id="btn-minus">−</button>
+        <button class="demo-btn purple" id="btn-reset">Reset</button>
+        <button class="demo-btn green" id="btn-plus">+</button>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="demo-section">
+      <h3>📋 Contact Form</h3>
+      <p>Fill out and submit — field changes and submission are captured as events.</p>
+      <form class="demo-form" id="demo-form">
+        <div class="form-group">
+          <label for="f-name">Full Name</label>
+          <input type="text" id="f-name" name="name" placeholder="Jane Smith" />
+        </div>
+        <div class="form-group">
+          <label for="f-email">Work Email</label>
+          <input type="email" id="f-email" name="email" placeholder="jane@acme.com" />
+        </div>
+        <div class="form-group">
+          <label for="f-company">Company Size</label>
+          <select id="f-company" name="company_size">
+            <option value="">Select...</option>
+            <option value="1-10">1-10 employees</option>
+            <option value="11-50">11-50 employees</option>
+            <option value="51-200">51-200 employees</option>
+            <option value="200+">200+ employees</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="f-message">Message</label>
+          <textarea id="f-message" name="message" rows="2" placeholder="Tell us about your use case..."></textarea>
+        </div>
+        <button type="submit" class="demo-btn purple" style="justify-self:start;">Submit Inquiry →</button>
+      </form>
+    </div>
+
+    <!-- Scroll depth hint -->
+    <div class="demo-section" style="text-align:center;">
+      <h3>📊 Scroll Depth</h3>
+      <p>Scroll this panel to trigger 25%, 50%, 75%, and 100% scroll milestones.</p>
+      <div style="font-size:48px;padding:20px;">⬇️</div>
+    </div>
+
+    <div style="height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted-light);font-size:13px;">
+      Keep scrolling to hit 100% scroll depth…
+    </div>
+  </div>
+
+  <div class="demo-footer">
+    Acme SaaS Demo · Powered by <a href="https://github.com/Jozo132/u-click" style="color:var(--accent);text-decoration:none;" target="_blank">u-click</a>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     RIGHT PANE — Admin Analytics Dashboard
+     ═══════════════════════════════════════════════════════════ -->
+<div class="right-pane" id="right-pane">
+  <div class="pane-label">📊 Admin Dashboard</div>
+
+  <div class="admin-header">
+    <div class="admin-logo">u<span>-</span>click</div>
+    <div class="admin-badge">Analytics</div>
+    <div class="admin-spacer"></div>
+    <div class="live-label">
+      <span class="live-dot"></span>
+      Live
+    </div>
+  </div>
+
+  <div class="admin-body">
+    <!-- KPI Cards -->
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-icon">👥</div>
+        <div class="kpi-label">Active Sessions</div>
+        <div class="kpi-value" id="kpi-sessions">1</div>
+        <div class="kpi-trend up" id="kpi-sessions-trend">↗ You're the session</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">📄</div>
+        <div class="kpi-label">Page Views</div>
+        <div class="kpi-value" id="kpi-pageviews">0</div>
+        <div class="kpi-sub" id="kpi-pageviews-sub">this session</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">🖱️</div>
+        <div class="kpi-label">Total Clicks</div>
+        <div class="kpi-value" id="kpi-clicks">0</div>
+        <div class="kpi-sub" id="kpi-clicks-sub">tracked interactions</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon">📊</div>
+        <div class="kpi-label">Total Events</div>
+        <div class="kpi-value" id="kpi-events">0</div>
+        <div class="kpi-sub" id="kpi-events-sub">all types</div>
+      </div>
+    </div>
+
+    <!-- Engagement Metrics -->
+    <div class="engagement-row">
+      <div class="admin-card">
+        <div class="admin-card-title">📈 Engagement Score</div>
+        <div style="font-size:24px;font-weight:800;" id="engagement-score">0%</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="engagement-bar" style="width:0%;background:var(--accent);"></div></div>
+        <div style="font-size:10px;color:var(--muted-dark);margin-top:6px;" id="engagement-desc">Interact to build engagement</div>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-title">📊 Scroll Depth</div>
+        <div style="font-size:24px;font-weight:800;" id="scroll-depth">0%</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="scroll-bar" style="width:0%;background:var(--accent2);"></div></div>
+        <div style="font-size:10px;color:var(--muted-dark);margin-top:6px;">Content consumed</div>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-title">⏱️ Time on Page</div>
+        <div style="font-size:24px;font-weight:800;" id="time-on-page">0s</div>
+        <div class="metric-bar"><div class="metric-bar-fill" id="time-bar" style="width:0%;background:var(--warn);"></div></div>
+        <div style="font-size:10px;color:var(--muted-dark);margin-top:6px;">Session duration</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="admin-card">
+        <div class="admin-card-title">📈 Events Over Time</div>
+        <div class="chart-container"><canvas id="timeline-chart"></canvas></div>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-title">🍩 Event Breakdown</div>
+        <div class="chart-container"><canvas id="type-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Tables: Top Elements + Top Pages -->
+    <div class="admin-tables">
+      <div class="admin-card">
+        <div class="admin-card-title">🖱️ Top Clicked Elements</div>
+        <div style="overflow-x:auto;">
+          <table class="admin-tbl" id="elements-table">
+            <thead><tr><th>Element</th><th>Clicks</th><th>% of Total</th></tr></thead>
+            <tbody><tr><td colspan="3" style="color:var(--muted-dark);padding:12px;text-align:center;font-size:11px;">Click elements on the left…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="admin-card">
+        <div class="admin-card-title">📄 Conversion Funnel</div>
+        <div id="funnel-chart" style="padding:8px 0;">
+          <div style="color:var(--muted-dark);padding:12px;text-align:center;font-size:11px;">Interact to build funnel data…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Feed -->
+    <div class="admin-card" style="margin-bottom:20px;">
+      <div class="admin-card-title">
+        ⚡ Live Event Feed
+        <span style="margin-left:auto;font-size:10px;color:var(--muted-dark);font-weight:400;" id="feed-count">0 events</span>
+      </div>
+      <div class="feed-list" id="feed-list">
+        <div style="color:var(--muted-dark);padding:16px;text-align:center;font-size:11px;">Waiting for events…</div>
+      </div>
+    </div>
+
+    <!-- Click Heatmap -->
+    <div class="admin-card" style="margin-bottom:20px;">
+      <div class="admin-card-title">🔥 Click Heatmap</div>
+      <canvas id="heatmap-canvas" style="width:100%;border-radius:6px;display:block;" height="200"></canvas>
+    </div>
+
+    <!-- Sessions -->
+    <div class="admin-card session-row">
+      <div class="admin-card-title">👤 Active Sessions</div>
+      <div style="overflow-x:auto;">
+        <table class="admin-tbl" id="sessions-table">
+          <thead><tr><th>Session</th><th>Events</th><th>Clicks</th><th>Duration</th><th>Engagement</th></tr></thead>
+          <tbody id="sessions-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /splitscreen -->
+
+<!-- Chart.js from CDN for GitHub Pages (no backend) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+
+<script>
+;(function () {
+  'use strict'
+
+  // ═══════════════════════════════════════════════════════════════
+  // Mock Analytics Engine — replaces the real backend for the demo
+  // ═══════════════════════════════════════════════════════════════
+
+  var SESSION_ID = 'demo-' + Date.now().toString(36) + '-' + Array.from(crypto.getRandomValues(new Uint8Array(4))).map(function(b) { return b.toString(16).padStart(2, '0') }).join('')
+  var SESSION_START = Date.now()
+  var events = []
+  var typeCounts = {}
+  var elementClicks = {}
+  var scrollMax = 0
+  var funnelSteps = { pageview: 0, click: 0, field_change: 0, form_submit: 0 }
+  var rageClicks = []
+  var RAGE_WINDOW = 500
+  var RAGE_COUNT = 3
+
+  // Escape HTML helper
+  function esc(s) { return (s === null || s === undefined) ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;') }
+
+  function recordEvent(evt) {
+    evt.session_id = SESSION_ID
+    evt.ts = Date.now()
+    events.push(evt)
+
+    // Count by type
+    typeCounts[evt.type] = (typeCounts[evt.type] || 0) + 1
+
+    // Funnel tracking
+    if (funnelSteps.hasOwnProperty(evt.type)) {
+      funnelSteps[evt.type]++
+    }
+
+    // Element click tracking
+    if (evt.type === 'click' && evt.target_desc) {
+      elementClicks[evt.target_desc] = (elementClicks[evt.target_desc] || 0) + 1
+    }
+
+    // Scroll tracking
+    if (evt.type === 'scroll' && evt.scroll_pct > scrollMax) {
+      scrollMax = evt.scroll_pct
+    }
+
+    // Update all dashboard widgets
+    updateDashboard()
+    addFeedItem(evt)
+    updateCharts()
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // LEFT PANE — Event Capture from User Interactions
+  // ═══════════════════════════════════════════════════════════════
+
+  var leftPane = document.getElementById('left-pane')
+
+  // Helper to extract element info
+  function elInfo(el) {
+    if (!el) return { target_desc: 'unknown' }
+    var tag = el.tagName ? el.tagName.toLowerCase() : '?'
+    var id = el.id ? '#' + el.id : ''
+    var cls = el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/)[0] : ''
+    var text = (el.textContent || '').trim().slice(0, 40)
+    return {
+      target_tag: tag,
+      target_id: el.id || null,
+      target_cls: el.className && typeof el.className === 'string' ? el.className.trim() : null,
+      target_text: text || null,
+      target_desc: tag + id + cls + (text ? ' "' + text.slice(0, 20) + '"' : ''),
+    }
+  }
+
+  // Walk up to find interactive ancestor
+  function findInteractive(el) {
+    var INTERACTIVE = { A: 1, BUTTON: 1, INPUT: 1, SELECT: 1, TEXTAREA: 1, LABEL: 1 }
+    var node = el
+    for (var i = 0; i < 5 && node && node !== document.body; i++) {
+      if (INTERACTIVE[node.tagName]) return node
+      if (node.getAttribute && (node.getAttribute('role') === 'button' || node.getAttribute('data-action'))) return node
+      node = node.parentElement
+    }
+    return el
+  }
+
+  // Click tracking (on left pane only)
+  leftPane.addEventListener('click', function (e) {
+    var target = findInteractive(e.target)
+    var info = elInfo(target)
+    var isRage = false
+
+    // Rage click detection
+    var t = Date.now()
+    rageClicks = rageClicks.filter(function (ts) { return t - ts < RAGE_WINDOW })
+    rageClicks.push(t)
+    if (rageClicks.length >= RAGE_COUNT) {
+      rageClicks = []
+      isRage = true
+    }
+
+    var rect = leftPane.getBoundingClientRect()
+    recordEvent(Object.assign({
+      type: 'click',
+      x: Math.round(e.clientX - rect.left),
+      y: Math.round(e.clientY - rect.top),
+      page_url: 'demo://acme-saas/',
+      is_rage: isRage,
+    }, info))
+  }, true)
+
+  // Form changes
+  leftPane.addEventListener('change', function (e) {
+    var el = e.target
+    if (el.type === 'password') return
+    var info = elInfo(el)
+    recordEvent(Object.assign({
+      type: 'field_change',
+      page_url: 'demo://acme-saas/',
+      input_type: el.type || el.tagName.toLowerCase(),
+    }, info))
+  }, true)
+
+  // Form submit
+  document.getElementById('demo-form').addEventListener('submit', function (e) {
+    e.preventDefault()
+    recordEvent({
+      type: 'form_submit',
+      page_url: 'demo://acme-saas/',
+      target_tag: 'form',
+      target_id: 'demo-form',
+      target_desc: 'form#demo-form "Contact Form"',
+      target_text: 'Contact Form',
+    })
+    // Visual feedback
+    var btn = e.target.querySelector('button[type="submit"]')
+    if (btn) {
+      var orig = btn.textContent
+      btn.textContent = '✓ Submitted!'
+      btn.style.background = '#38a169'
+      setTimeout(function () { btn.textContent = orig; btn.style.background = ''; }, 1500)
+    }
+  })
+
+  // Tab switching
+  document.getElementById('demo-tabs').addEventListener('click', function (e) {
+    if (!e.target.classList.contains('tab')) return
+    var tabId = e.target.getAttribute('data-tab')
+    // Update active states
+    document.querySelectorAll('#demo-tabs .tab').forEach(function (t) { t.classList.remove('active') })
+    e.target.classList.add('active')
+    document.querySelectorAll('.tab-content').forEach(function (c) { c.classList.remove('active') })
+    var target = document.querySelector('[data-tab-content="' + tabId + '"]')
+    if (target) target.classList.add('active')
+    // Record pageview for tab navigation
+    recordEvent({
+      type: 'pageview',
+      page_url: 'demo://acme-saas/' + tabId,
+      target_desc: 'tab "' + tabId + '"',
+      target_text: tabId,
+    })
+  })
+
+  // Counter
+  var count = 0
+  document.getElementById('btn-plus').addEventListener('click', function () {
+    count++
+    document.getElementById('counter').textContent = count
+  })
+  document.getElementById('btn-minus').addEventListener('click', function () {
+    count--
+    document.getElementById('counter').textContent = count
+  })
+  document.getElementById('btn-reset').addEventListener('click', function () {
+    count = 0
+    document.getElementById('counter').textContent = count
+  })
+
+  // Scroll tracking on left pane
+  var scrollMilestones = [25, 50, 75, 100]
+  var scrollReached = {}
+  var scrollTimer = null
+  leftPane.addEventListener('scroll', function () {
+    clearTimeout(scrollTimer)
+    scrollTimer = setTimeout(function () {
+      var scrolled = leftPane.scrollTop
+      var total = Math.max(leftPane.scrollHeight - leftPane.clientHeight, 1)
+      var pct = Math.min(100, Math.round((scrolled / total) * 100))
+      for (var i = 0; i < scrollMilestones.length; i++) {
+        var m = scrollMilestones[i]
+        if (pct >= m && !scrollReached[m]) {
+          scrollReached[m] = true
+          recordEvent({
+            type: 'scroll',
+            page_url: 'demo://acme-saas/',
+            scroll_pct: m,
+            target_desc: 'scroll ' + m + '%',
+            target_text: m + '% scroll',
+          })
+        }
+      }
+    }, 200)
+  }, { passive: true })
+
+  // Initial pageview
+  recordEvent({
+    type: 'pageview',
+    page_url: 'demo://acme-saas/',
+    target_desc: 'page "Acme SaaS"',
+    target_text: 'Acme SaaS Home',
+  })
+
+  // ═══════════════════════════════════════════════════════════════
+  // RIGHT PANE — Dashboard Updates
+  // ═══════════════════════════════════════════════════════════════
+
+  function updateDashboard() {
+    var clicks = typeCounts['click'] || 0
+    var pageviews = typeCounts['pageview'] || 0
+    var totalEvents = events.length
+    var elapsed = Math.round((Date.now() - SESSION_START) / 1000)
+
+    // KPI Cards
+    document.getElementById('kpi-sessions').textContent = '1'
+    document.getElementById('kpi-pageviews').textContent = pageviews
+    document.getElementById('kpi-clicks').textContent = clicks
+    document.getElementById('kpi-events').textContent = totalEvents
+    document.getElementById('kpi-events-sub').textContent = Object.keys(typeCounts).length + ' types tracked'
+    document.getElementById('kpi-clicks-sub').textContent =
+      (typeCounts['form_submit'] || 0) + ' form submits'
+
+    // Engagement score: weighted calculation
+    var engScore = Math.min(100, Math.round(
+      (clicks * 3) + (pageviews * 5) + ((typeCounts['field_change'] || 0) * 8) +
+      ((typeCounts['form_submit'] || 0) * 15) + (scrollMax * 0.3) +
+      Math.min(elapsed * 0.1, 10)
+    ))
+    document.getElementById('engagement-score').textContent = engScore + '%'
+    document.getElementById('engagement-bar').style.width = engScore + '%'
+    var engDesc = engScore < 20 ? 'Low — keep interacting!' :
+                  engScore < 50 ? 'Moderate — good progress' :
+                  engScore < 80 ? 'High — great engagement!' : 'Excellent — power user!'
+    document.getElementById('engagement-desc').textContent = engDesc
+
+    // Scroll depth
+    document.getElementById('scroll-depth').textContent = scrollMax + '%'
+    document.getElementById('scroll-bar').style.width = scrollMax + '%'
+
+    // Time on page
+    var min = Math.floor(elapsed / 60)
+    var sec = elapsed % 60
+    document.getElementById('time-on-page').textContent = min > 0 ? min + 'm ' + sec + 's' : sec + 's'
+    document.getElementById('time-bar').style.width = Math.min(100, (elapsed / 180) * 100) + '%'
+
+    // Feed count
+    document.getElementById('feed-count').textContent = totalEvents + ' events'
+
+    // Top elements table
+    updateElementsTable()
+
+    // Funnel
+    updateFunnel()
+
+    // Sessions table
+    updateSessionsTable(elapsed, clicks, engScore)
+
+    // Heatmap
+    updateHeatmap()
+  }
+
+  function updateElementsTable() {
+    var sorted = Object.entries(elementClicks).sort(function (a, b) { return b[1] - a[1] }).slice(0, 8)
+    var totalClicks = typeCounts['click'] || 1
+    var tbody = document.querySelector('#elements-table tbody')
+    if (!sorted.length) return
+    tbody.innerHTML = sorted.map(function (entry) {
+      var pct = Math.round((entry[1] / totalClicks) * 100)
+      return '<tr><td style="font-family:monospace;font-size:11px;">' + esc(entry[0].slice(0, 35)) + '</td>' +
+             '<td>' + entry[1] + '</td>' +
+             '<td><div style="display:flex;align-items:center;gap:6px;">' +
+               '<div style="width:50px;height:4px;background:var(--border-dark);border-radius:2px;overflow:hidden;">' +
+                 '<div style="height:100%;width:' + pct + '%;background:var(--accent);border-radius:2px;"></div>' +
+               '</div>' +
+               '<span>' + pct + '%</span></div></td></tr>'
+    }).join('')
+  }
+
+  function updateFunnel() {
+    var steps = [
+      { label: 'Page Views', count: funnelSteps.pageview, color: 'var(--accent2)' },
+      { label: 'Clicks', count: funnelSteps.click, color: 'var(--accent)' },
+      { label: 'Field Changes', count: funnelSteps.field_change, color: 'var(--warn)' },
+      { label: 'Form Submits', count: funnelSteps.form_submit, color: 'var(--danger)' },
+    ]
+    var maxCount = Math.max(1, steps[0].count)
+    var el = document.getElementById('funnel-chart')
+    el.innerHTML = steps.map(function (s) {
+      var pct = Math.round((s.count / maxCount) * 100)
+      var convRate = s.count > 0 && maxCount > 0 ? Math.round((s.count / maxCount) * 100) : 0
+      return '<div style="margin-bottom:8px;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;">' +
+          '<span>' + s.label + '</span>' +
+          '<span style="color:var(--muted-dark);">' + s.count + ' (' + convRate + '%)</span>' +
+        '</div>' +
+        '<div style="height:20px;background:var(--border-dark);border-radius:4px;overflow:hidden;">' +
+          '<div style="height:100%;width:' + pct + '%;background:' + s.color + ';border-radius:4px;transition:width .5s ease;"></div>' +
+        '</div></div>'
+    }).join('')
+  }
+
+  function updateSessionsTable(elapsed, clicks, engScore) {
+    var tbody = document.getElementById('sessions-tbody')
+    var min = Math.floor(elapsed / 60)
+    var sec = elapsed % 60
+    var dur = min > 0 ? min + 'm ' + sec + 's' : sec + 's'
+    tbody.innerHTML = '<tr>' +
+      '<td style="font-family:monospace;font-size:10px;color:var(--accent);">' + esc(SESSION_ID.slice(0, 16)) + '…</td>' +
+      '<td>' + events.length + '</td>' +
+      '<td>' + clicks + '</td>' +
+      '<td>' + dur + '</td>' +
+      '<td><div style="display:flex;align-items:center;gap:6px;">' +
+        '<div style="width:40px;height:4px;background:var(--border-dark);border-radius:2px;overflow:hidden;">' +
+          '<div style="height:100%;width:' + engScore + '%;background:' + (engScore > 60 ? 'var(--accent2)' : engScore > 30 ? 'var(--warn)' : 'var(--danger)') + ';border-radius:2px;"></div>' +
+        '</div>' +
+        '<span style="font-size:10px;">' + engScore + '%</span></div></td></tr>'
+  }
+
+  // ── Feed ──────────────────────────────────────────────────────
+  var feedInitialized = false
+  function addFeedItem(evt) {
+    var feed = document.getElementById('feed-list')
+    if (!feedInitialized) {
+      feed.innerHTML = ''
+      feedInitialized = true
+    }
+    var ts = new Date(evt.ts)
+    var timeStr = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    var badgeCls = 'badge-other'
+    if (evt.type === 'click') badgeCls = evt.is_rage ? 'badge-rage' : 'badge-click'
+    else if (evt.type === 'pageview') badgeCls = 'badge-pageview'
+    else if (evt.type === 'scroll') badgeCls = 'badge-scroll'
+    else if (evt.type === 'form_submit' || evt.type === 'field_change') badgeCls = 'badge-form'
+    else if (evt.type === 'idle') badgeCls = 'badge-idle'
+    else if (evt.type === 'active') badgeCls = 'badge-active'
+
+    var typeLabel = evt.is_rage ? '🔥 rage click' : evt.type
+    var detail = evt.target_text ? esc(evt.target_text.slice(0, 40)) : (evt.target_desc ? esc(evt.target_desc.slice(0, 40)) : '')
+
+    var html = '<div class="feed-item">' +
+      '<span class="feed-ts">' + timeStr + '</span>' +
+      '<span class="feed-type"><span class="badge ' + badgeCls + '">' + esc(typeLabel) + '</span></span>' +
+      '<span class="feed-detail">' + detail + '</span>' +
+    '</div>'
+
+    feed.insertAdjacentHTML('afterbegin', html)
+
+    // Limit to 100 items
+    var items = feed.querySelectorAll('.feed-item')
+    for (var i = 100; i < items.length; i++) items[i].remove()
+  }
+
+  // ── Heatmap ──────────────────────────────────────────────────
+  function updateHeatmap() {
+    var canvas = document.getElementById('heatmap-canvas')
+    var ctx = canvas.getContext('2d')
+    var W = canvas.offsetWidth || 400
+    canvas.width = W
+    canvas.height = 200
+
+    ctx.fillStyle = '#111318'
+    ctx.fillRect(0, 0, W, 200)
+
+    var clickEvents = events.filter(function (e) { return e.type === 'click' && e.x != null })
+    if (!clickEvents.length) {
+      ctx.fillStyle = '#8892a4'
+      ctx.font = '12px system-ui'
+      ctx.textAlign = 'center'
+      ctx.fillText('Click on the left panel to generate heatmap data', W / 2, 100)
+      return
+    }
+
+    var paneW = leftPane.offsetWidth || 1
+    var paneH = leftPane.scrollHeight || 1
+
+    clickEvents.forEach(function (pt) {
+      var px = (pt.x / paneW) * W
+      var py = (pt.y / paneH) * 200
+      px = Math.max(0, Math.min(W, px))
+      py = Math.max(0, Math.min(200, py))
+
+      var grad = ctx.createRadialGradient(px, py, 0, px, py, 18)
+      grad.addColorStop(0, 'rgba(108,99,255,.3)')
+      grad.addColorStop(1, 'rgba(108,99,255,0)')
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(px, py, 18, 0, Math.PI * 2)
+      ctx.fill()
+
+      ctx.fillStyle = 'rgba(108,99,255,.8)'
+      ctx.beginPath()
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+
+  // ── Charts ───────────────────────────────────────────────────
+  var timelineChart = null
+  var typeChart = null
+  var timelineBuckets = {}
+  var BUCKET_SIZE = 10000 // 10-second buckets for the demo
+
+  function updateCharts() {
+    updateTimelineChart()
+    updateTypeChart()
+  }
+
+  function updateTimelineChart() {
+    // Build timeline data from events
+    var buckets = {}
+    var types = new Set()
+    events.forEach(function (e) {
+      var bucket = Math.floor(e.ts / BUCKET_SIZE) * BUCKET_SIZE
+      if (!buckets[bucket]) buckets[bucket] = {}
+      buckets[bucket][e.type] = (buckets[bucket][e.type] || 0) + 1
+      types.add(e.type)
+    })
+
+    var labels = Object.keys(buckets).sort()
+    var typeArr = Array.from(types)
+
+    var COLORS = {
+      click: 'rgba(108,99,255,.8)',
+      pageview: 'rgba(0,212,170,.8)',
+      scroll: 'rgba(245,158,11,.7)',
+      form_submit: 'rgba(255,79,79,.7)',
+      field_change: 'rgba(255,159,64,.7)',
+      idle: 'rgba(100,100,120,.5)',
+      active: 'rgba(80,200,120,.5)',
+    }
+
+    var datasets = typeArr.map(function (t) {
+      return {
+        label: t,
+        data: labels.map(function (b) { return buckets[b][t] || 0 }),
+        backgroundColor: COLORS[t] || 'rgba(150,150,200,.6)',
+        borderRadius: 3,
+      }
+    })
+
+    var ctx = document.getElementById('timeline-chart').getContext('2d')
+    if (timelineChart) {
+      timelineChart.data.labels = labels.map(function (b) {
+        return new Date(Number(b)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      })
+      timelineChart.data.datasets = datasets
+      timelineChart.update('none')
+    } else {
+      timelineChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels.map(function (b) {
+            return new Date(Number(b)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          }),
+          datasets: datasets,
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 200 },
+          plugins: { legend: { labels: { color: '#8892a4', font: { size: 10 } } } },
+          scales: {
+            x: { stacked: true, ticks: { color: '#8892a4', maxTicksLimit: 6, font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.05)' } },
+            y: { stacked: true, ticks: { color: '#8892a4', font: { size: 9 } }, grid: { color: 'rgba(255,255,255,.05)' } },
+          },
+        },
+      })
+    }
+  }
+
+  function updateTypeChart() {
+    var data = Object.entries(typeCounts).map(function (e) { return { type: e[0], count: e[1] } })
+    var COLORS2 = ['#6c63ff','#00d4aa','#f59e0b','#ff4f4f','#ff9f40','#4bc0c0','#9966ff','#c9cbcf']
+
+    var ctx = document.getElementById('type-chart').getContext('2d')
+    if (typeChart) {
+      typeChart.data.labels = data.map(function (r) { return r.type })
+      typeChart.data.datasets[0].data = data.map(function (r) { return r.count })
+      typeChart.update('none')
+    } else {
+      typeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: data.map(function (r) { return r.type }),
+          datasets: [{ data: data.map(function (r) { return r.count }), backgroundColor: COLORS2, borderWidth: 1, borderColor: '#1a1d27' }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '60%',
+          animation: { duration: 200 },
+          plugins: { legend: { position: 'bottom', labels: { color: '#8892a4', font: { size: 10 }, padding: 8 } } },
+        },
+      })
+    }
+  }
+
+  // ── Timer for session duration ────────────────────────────────
+  setInterval(function () {
+    var elapsed = Math.round((Date.now() - SESSION_START) / 1000)
+    var min = Math.floor(elapsed / 60)
+    var sec = elapsed % 60
+    document.getElementById('time-on-page').textContent = min > 0 ? min + 'm ' + sec + 's' : sec + 's'
+    document.getElementById('time-bar').style.width = Math.min(100, (elapsed / 180) * 100) + '%'
+  }, 1000)
+
+  // ── Idle / Active tracking ────────────────────────────────────
+  var idleTimer = null
+  var isIdle = false
+  function resetIdle() {
+    if (isIdle) {
+      isIdle = false
+      recordEvent({ type: 'active', page_url: 'demo://acme-saas/', target_desc: 'user active', target_text: 'User resumed activity' })
+    }
+    clearTimeout(idleTimer)
+    idleTimer = setTimeout(function () {
+      isIdle = true
+      recordEvent({ type: 'idle', page_url: 'demo://acme-saas/', target_desc: 'user idle', target_text: 'User went idle (15s)' })
+    }, 15000) // 15s idle for demo (shorter than prod 30s)
+  }
+  ;['mousemove', 'keydown', 'touchstart', 'click'].forEach(function (ev) {
+    leftPane.addEventListener(ev, resetIdle, { passive: true })
+  })
+  resetIdle()
+
+})()
+</script>
+</body>
+</html>
