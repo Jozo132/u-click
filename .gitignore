@@ -137,3 +137,8 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# u-click runtime data
+analytics.db
+analytics.db-shm
+analytics.db-wal

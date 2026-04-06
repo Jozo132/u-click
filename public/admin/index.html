@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>u-click — Analytics Dashboard</title>
+  <style>
+    /* ── Reset / base ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #0f1117;
+      --surface: #1a1d27;
+      --border:  #2a2d3a;
+      --accent:  #6c63ff;
+      --accent2: #00d4aa;
+      --text:    #e2e8f0;
+      --muted:   #8892a4;
+      --danger:  #ff4f4f;
+      --warn:    #f59e0b;
+      --card-r:  12px;
+    }
+    html, body { height: 100%; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    .app { display: grid; grid-template-rows: 56px 1fr; height: 100vh; overflow: hidden; }
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 24px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo { font-weight: 700; font-size: 18px; letter-spacing: -.5px; }
+    .logo span { color: var(--accent); }
+    .spacer { flex: 1; }
+    .ws-badge {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--muted);
+    }
+    .ws-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); transition: background .3s; }
+    .ws-dot.connected { background: var(--accent2); }
+    .range-select { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; cursor: pointer; font-size: 12px; }
+
+    main { overflow-y: auto; padding: 24px; }
+
+    /* ── Grid ──────────────────────────────────────────────────────── */
+    .summary-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .chart-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .full-row { margin-bottom: 24px; }
+
+    @media (max-width: 900px) {
+      .chart-row, .chart-row-3 { grid-template-columns: 1fr; }
+    }
+
+    /* ── Card ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--card-r);
+      padding: 20px;
+    }
+    .card-title { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 12px; }
+    .stat-value { font-size: 32px; font-weight: 700; line-height: 1; }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Canvas ────────────────────────────────────────────────────── */
+    .chart-wrap { position: relative; height: 240px; }
+    .chart-wrap.tall { height: 320px; }
+
+    /* ── Table ─────────────────────────────────────────────────────── */
+    .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .tbl th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .tbl td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+    .tbl tr:last-child td { border-bottom: none; }
+    .tbl tr:hover td { background: rgba(255,255,255,.03); }
+    .truncate { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .badge { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-click  { background: rgba(108,99,255,.2); color: #a89fff; }
+    .badge-pv     { background: rgba(0,212,170,.15); color: #00d4aa; }
+    .badge-scroll { background: rgba(245,158,11,.15); color: #f59e0b; }
+    .badge-form   { background: rgba(255,79,79,.15); color: #ff4f4f; }
+    .badge-other  { background: rgba(255,255,255,.08); color: var(--muted); }
+
+    /* ── Feed ──────────────────────────────────────────────────────── */
+    #feed { max-height: 400px; overflow-y: auto; }
+    .feed-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      animation: fadeIn .3s ease;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    .feed-ts { color: var(--muted); min-width: 60px; }
+    .feed-type { min-width: 80px; }
+    .feed-detail { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── Heatmap ────────────────────────────────────────────────────── */
+    #heatmap-canvas { width: 100%; border-radius: 8px; display: block; }
+    .heatmap-ctrl { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+    .heatmap-ctrl input { flex: 1; min-width: 200px; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 10px; font-size: 12px; }
+    .btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; font-weight: 600; transition: opacity .15s; }
+    .btn:hover { opacity: .85; }
+
+    /* ── Loading ──────────────────────────────────────────────────── */
+    .loader { text-align: center; color: var(--muted); padding: 40px; }
+    .pulse { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:.5} }
+
+    /* scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">u<span>-</span>click</div>
+    <span style="color:var(--muted);font-size:12px;">Analytics Dashboard</span>
+    <div class="spacer"></div>
+    <select class="range-select" id="range-select">
+      <option value="3600000">Last hour</option>
+      <option value="86400000" selected>Last 24 h</option>
+      <option value="604800000">Last 7 days</option>
+      <option value="2592000000">Last 30 days</option>
+      <option value="0">All time</option>
+    </select>
+    <div class="ws-badge">
+      <div class="ws-dot" id="ws-dot"></div>
+      <span id="ws-status">Connecting…</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Summary cards -->
+    <div class="summary-row" id="summary-row">
+      <div class="card"><div class="card-title">Sessions</div><div class="stat-value" id="s-sessions">—</div></div>
+      <div class="card"><div class="card-title">Page Views</div><div class="stat-value" id="s-pageviews">—</div></div>
+      <div class="card"><div class="card-title">Total Events</div><div class="stat-value" id="s-events">—</div></div>
+      <div class="card"><div class="card-title">Total Clicks</div><div class="stat-value" id="s-clicks">—</div></div>
+      <div class="card"><div class="card-title">Unique Pages</div><div class="stat-value" id="s-pages">—</div></div>
+    </div>
+
+    <!-- Timeline + event types -->
+    <div class="chart-row">
+      <div class="card">
+        <div class="card-title">Events over time</div>
+        <div class="chart-wrap"><canvas id="timeline-chart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Event types</div>
+        <div class="chart-wrap"><canvas id="type-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Top pages + Top elements -->
+    <div class="chart-row">
+      <div class="card">
+        <div class="card-title">Top pages</div>
+        <div style="overflow-x:auto;">
+          <table class="tbl" id="pages-table">
+            <thead><tr><th>URL</th><th>Sessions</th><th>Events</th><th>Clicks</th></tr></thead>
+            <tbody><tr><td colspan="4" class="loader"><span class="pulse"></span></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Top clicked elements</div>
+        <div style="overflow-x:auto;">
+          <table class="tbl" id="elements-table">
+            <thead><tr><th>Element</th><th>Text</th><th>Clicks</th></tr></thead>
+            <tbody><tr><td colspan="3" class="loader"><span class="pulse"></span></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Click heatmap -->
+    <div class="full-row card">
+      <div class="card-title">Click positions (relative to viewport)</div>
+      <div class="heatmap-ctrl">
+        <input type="text" id="heatmap-url" placeholder="Filter by page URL (leave blank for all pages)" />
+        <button class="btn" onclick="loadHeatmap()">Apply</button>
+      </div>
+      <canvas id="heatmap-canvas" height="400"></canvas>
+    </div>
+
+    <!-- Recent events feed -->
+    <div class="full-row card">
+      <div class="card-title">Live event feed</div>
+      <div id="feed"><div class="loader"><span class="pulse"></span></div></div>
+    </div>
+
+    <!-- Sessions table -->
+    <div class="full-row card">
+      <div class="card-title">Recent sessions</div>
+      <div style="overflow-x:auto;">
+        <table class="tbl" id="sessions-table">
+          <thead><tr><th>Session</th><th>Page</th><th>Events</th><th>Clicks</th><th>Started</th></tr></thead>
+          <tbody><tr><td colspan="5" class="loader"><span class="pulse"></span></td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Chart.js served locally -->
+<script src="/chart.min.js"></script>
+<script>
+(function () {
+  'use strict'
+
+  /* ── helpers ─────────────────────────────────────────────────── */
+  var fmt = new Intl.NumberFormat()
+  var fmtN = (n) => n == null ? '—' : fmt.format(n)
+  var fmtTs = (ms) => {
+    var d = new Date(ms)
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+  var fmtDate = (ms) => new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  var esc = (s) => s == null ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
+
+  function typeBadge(type) {
+    var cls = 'badge-other'
+    if (type === 'click') cls = 'badge-click'
+    else if (type === 'pageview') cls = 'badge-pv'
+    else if (type === 'scroll') cls = 'badge-scroll'
+    else if (type === 'form_submit' || type === 'field_change') cls = 'badge-form'
+    return '<span class="badge ' + cls + '">' + esc(type) + '</span>'
+  }
+
+  /* ── range ────────────────────────────────────────────────────── */
+  var rangeMs = 86400000
+  document.getElementById('range-select').addEventListener('change', function (e) {
+    rangeMs = Number(e.target.value)
+    loadAll()
+  })
+
+  function sinceUntil() {
+    var until = Date.now()
+    var since = rangeMs > 0 ? until - rangeMs : 0
+    return { since, until }
+  }
+
+  function apiUrl(path, params) {
+    var { since, until } = sinceUntil()
+    var base = path + '?since=' + since + '&until=' + until
+    if (params) base += '&' + new URLSearchParams(params).toString()
+    return base
+  }
+
+  async function fetchJson(url) {
+    var r = await fetch(url)
+    return r.json()
+  }
+
+  /* ── WebSocket (real-time) ───────────────────────────────────── */
+  var wsUrl = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws?role=admin'
+  var wsDot = document.getElementById('ws-dot')
+  var wsStatus = document.getElementById('ws-status')
+  var wsRetry = 1000
+
+  function connectAdminWS() {
+    var ws = new WebSocket(wsUrl)
+    ws.onopen = () => {
+      wsDot.classList.add('connected')
+      wsStatus.textContent = 'Live'
+      wsRetry = 1000
+    }
+    ws.onclose = () => {
+      wsDot.classList.remove('connected')
+      wsStatus.textContent = 'Reconnecting…'
+      setTimeout(connectAdminWS, wsRetry)
+      wsRetry = Math.min(wsRetry * 2, 30000)
+    }
+    ws.onmessage = (e) => {
+      try {
+        var data = JSON.parse(e.data)
+        if (data.type === 'new_events') {
+          prependFeedItems(data.events || [])
+          // Refresh summary & timeline on every update
+          loadSummary()
+          loadTimeline()
+        }
+      } catch (_) {}
+    }
+  }
+  connectAdminWS()
+
+  /* ── Summary cards ────────────────────────────────────────────── */
+  async function loadSummary() {
+    var data = await fetchJson(apiUrl('/api/stats/summary'))
+    document.getElementById('s-sessions').textContent  = fmtN(data.total_sessions)
+    document.getElementById('s-pageviews').textContent = fmtN(data.total_pageviews)
+    document.getElementById('s-events').textContent    = fmtN(data.total_events)
+    document.getElementById('s-clicks').textContent    = fmtN(data.total_clicks)
+    document.getElementById('s-pages').textContent     = fmtN(data.total_pages)
+  }
+
+  /* ── Timeline chart ────────────────────────────────────────────── */
+  var timelineChart = null
+  async function loadTimeline() {
+    var { since, until } = sinceUntil()
+    var span = until - since
+    var interval = span > 86400000 * 2 ? 3600000 * 24 : span > 86400000 ? 3600000 : 600000
+    var data = await fetchJson('/api/stats/timeline?since=' + since + '&until=' + until + '&interval=' + interval)
+
+    // Group by type
+    var buckets = {}
+    var types = new Set()
+    data.forEach(r => {
+      if (!buckets[r.bucket]) buckets[r.bucket] = {}
+      buckets[r.bucket][r.type] = r.count
+      types.add(r.type)
+    })
+    var labels = Object.keys(buckets).sort()
+    var typeArr = [...types]
+
+    var COLORS = {
+      click: 'rgba(108,99,255,.8)',
+      pageview: 'rgba(0,212,170,.8)',
+      scroll: 'rgba(245,158,11,.7)',
+      form_submit: 'rgba(255,79,79,.7)',
+      field_change: 'rgba(255,159,64,.7)',
+      idle: 'rgba(100,100,120,.5)',
+      active: 'rgba(80,200,120,.5)',
+    }
+    var datasets = typeArr.map(t => ({
+      label: t,
+      data: labels.map(b => buckets[b][t] || 0),
+      backgroundColor: COLORS[t] || 'rgba(150,150,200,.6)',
+      borderRadius: 4,
+    }))
+
+    var ctx = document.getElementById('timeline-chart').getContext('2d')
+    if (timelineChart) timelineChart.destroy()
+    timelineChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels.map(b => fmtDate(Number(b))),
+        datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#8892a4', font: { size: 11 } } } },
+        scales: {
+          x: { stacked: true, ticks: { color: '#8892a4', maxTicksLimit: 8, font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.05)' } },
+          y: { stacked: true, ticks: { color: '#8892a4', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.05)' } },
+        },
+      },
+    })
+  }
+
+  /* ── Event type doughnut ───────────────────────────────────────── */
+  var typeChart = null
+  async function loadTypeChart() {
+    var data = await fetchJson(apiUrl('/api/stats/event-types'))
+    var COLORS2 = ['#6c63ff','#00d4aa','#f59e0b','#ff4f4f','#ff9f40','#4bc0c0','#9966ff','#c9cbcf']
+    var ctx = document.getElementById('type-chart').getContext('2d')
+    if (typeChart) typeChart.destroy()
+    typeChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: data.map(r => r.type),
+        datasets: [{ data: data.map(r => r.count), backgroundColor: COLORS2, borderWidth: 1, borderColor: '#1a1d27' }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: { legend: { position: 'right', labels: { color: '#8892a4', font: { size: 11 }, padding: 12 } } },
+      },
+    })
+  }
+
+  /* ── Top pages table ──────────────────────────────────────────── */
+  async function loadPages() {
+    var data = await fetchJson(apiUrl('/api/stats/pages'))
+    var tbody = document.querySelector('#pages-table tbody')
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:16px;">No data</td></tr>'; return }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td class="truncate" title="${esc(r.page_url)}">${esc(r.page_url)}</td>
+        <td>${fmtN(r.sessions)}</td>
+        <td>${fmtN(r.events)}</td>
+        <td>${fmtN(r.clicks)}</td>
+      </tr>`).join('')
+  }
+
+  /* ── Top elements table ────────────────────────────────────────── */
+  async function loadElements() {
+    var data = await fetchJson(apiUrl('/api/stats/elements'))
+    var tbody = document.querySelector('#elements-table tbody')
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:16px;">No data</td></tr>'; return }
+    tbody.innerHTML = data.map(r => {
+      var tag = esc(r.target_tag || '?')
+      var id = r.target_id ? '#' + esc(r.target_id) : ''
+      var cls = r.target_cls ? '.' + esc(r.target_cls.split(' ')[0]) : ''
+      return `<tr>
+        <td><code>${tag}${id}${cls}</code></td>
+        <td class="truncate" title="${esc(r.target_text)}">${esc(r.target_text) || '<em style="color:var(--muted)">—</em>'}</td>
+        <td>${fmtN(r.clicks)}</td>
+      </tr>`
+    }).join('')
+  }
+
+  /* ── Heatmap (canvas) ─────────────────────────────────────────── */
+  async function loadHeatmap() {
+    var pageUrl = document.getElementById('heatmap-url').value.trim()
+    var params = { limit: 2000 }
+    if (pageUrl) params.page_url = pageUrl
+    var { since, until } = sinceUntil()
+    var qs = new URLSearchParams(Object.assign({ since, until }, params)).toString()
+    var data = await fetchJson('/api/stats/clicks?' + qs)
+
+    var canvas = document.getElementById('heatmap-canvas')
+    var ctx = canvas.getContext('2d')
+    var W = canvas.offsetWidth || 800
+    canvas.width = W
+    canvas.height = 400
+
+    ctx.fillStyle = '#111318'
+    ctx.fillRect(0, 0, W, 400)
+
+    if (!data.length) {
+      ctx.fillStyle = '#8892a4'
+      ctx.font = '14px system-ui'
+      ctx.textAlign = 'center'
+      ctx.fillText('No click data in range', W / 2, 200)
+      return
+    }
+
+    // Draw heatmap dots
+    data.forEach(pt => {
+      // x/y are viewport-relative at time of click; normalize to canvas
+      // Use screen coordinates if available, otherwise raw
+      var px = (pt.x / (pt.screen_w || 1920)) * W
+      var py = (pt.y / (pt.screen_h || 1080)) * 400
+      if (pt.x == null || pt.y == null) return
+
+      var grad = ctx.createRadialGradient(px, py, 0, px, py, 24)
+      grad.addColorStop(0, 'rgba(108,99,255,.25)')
+      grad.addColorStop(1, 'rgba(108,99,255,0)')
+      ctx.fillStyle = grad
+      ctx.beginPath()
+      ctx.arc(px, py, 24, 0, Math.PI * 2)
+      ctx.fill()
+
+      ctx.fillStyle = 'rgba(108,99,255,.7)'
+      ctx.beginPath()
+      ctx.arc(px, py, 3, 0, Math.PI * 2)
+      ctx.fill()
+    })
+  }
+
+  /* ── Recent event feed ─────────────────────────────────────────── */
+  async function loadFeed() {
+    var data = await fetchJson(apiUrl('/api/events/recent', { limit: 80 }))
+    var feed = document.getElementById('feed')
+    if (!data.length) { feed.innerHTML = '<div class="loader" style="color:var(--muted);">No events yet</div>'; return }
+    feed.innerHTML = data.map(r => feedHtml(r)).join('')
+  }
+
+  function feedHtml(r) {
+    var url = r.page_url || ''
+    var detail = r.target_text
+      ? esc(r.target_text.slice(0, 60))
+      : (r.target_tag ? '<' + esc(r.target_tag) + '>' : esc(url.slice(0, 60)))
+    return `<div class="feed-item">
+      <span class="feed-ts">${fmtTs(r.created_at || r.ts || Date.now())}</span>
+      <span class="feed-type">${typeBadge(r.type)}</span>
+      <span class="feed-detail" title="${esc(url)}">${detail}</span>
+    </div>`
+  }
+
+  function prependFeedItems(events) {
+    var feed = document.getElementById('feed')
+    // Remove loader if present
+    var loader = feed.querySelector('.loader')
+    if (loader) loader.remove()
+    var html = events.map(feedHtml).join('')
+    feed.insertAdjacentHTML('afterbegin', html)
+    // Limit to 200 items
+    var items = feed.querySelectorAll('.feed-item')
+    for (var i = 200; i < items.length; i++) items[i].remove()
+  }
+
+  /* ── Sessions table ────────────────────────────────────────────── */
+  async function loadSessions() {
+    var data = await fetchJson(apiUrl('/api/stats/sessions', { limit: 30 }))
+    var tbody = document.querySelector('#sessions-table tbody')
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);padding:16px;">No sessions</td></tr>'; return }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td style="font-family:monospace;font-size:11px;color:var(--muted)">${esc(r.id.slice(0, 12))}…</td>
+        <td class="truncate" title="${esc(r.page_url)}">${esc(r.page_url)}</td>
+        <td>${fmtN(r.event_count)}</td>
+        <td>${fmtN(r.click_count)}</td>
+        <td>${fmtDate(r.created_at)}</td>
+      </tr>`).join('')
+  }
+
+  /* ── Load all ─────────────────────────────────────────────────── */
+  function loadAll() {
+    loadSummary()
+    loadTimeline()
+    loadTypeChart()
+    loadPages()
+    loadElements()
+    loadFeed()
+    loadHeatmap()
+    loadSessions()
+  }
+
+  loadAll()
+
+  // Auto-refresh every 30 seconds
+  setInterval(() => {
+    loadSummary()
+    loadPages()
+    loadElements()
+    loadSessions()
+  }, 30000)
+})()
+</script>
+</body>
+</html>
